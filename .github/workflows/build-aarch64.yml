@@ -41,6 +41,7 @@ jobs:
             libdrm-dev \
             eudev-dev \
             libseat-dev \
+            libinput-dev \
             libxkbcommon-dev \
             wayland-dev \
             github-cli
@@ -65,9 +66,12 @@ jobs:
           git fetch --depth 1 origin "$GITHUB_SHA"
           git checkout -q --detach "$GITHUB_SHA"
 
+      # Alpine ships only shared libs (no static archives), so disable musl's
+      # default fully-static CRT and link dynamically against them.
       - name: Build release binary
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
+          export RUSTFLAGS="-C target-feature=-crt-static"
           cargo build --release
 
       - name: Resolve app version

@@ -45,7 +45,10 @@ dependencies (`gbm`, `libseat`, `libudev`, `libxkbcommon`, `pkg-config`),
 `fontconfig`, and the Wayland development headers.
 
 The release workflow builds inside an **Alpine** container, so the published
-binary is statically tied to musl (`aarch64-unknown-linux-musl`).
+binary is based on musl (`aarch64-unknown-linux-musl`). Alpine ships only
+dynamic libraries, so the binary links the system libs at runtime and needs
+`libseat`, `libinput`, `libxkbcommon`, `fontconfig`, `freetype`, `gbm`, `drm`,
+`udev`, and Wayland client libs installed on the target device.
 
 ## Building
 
