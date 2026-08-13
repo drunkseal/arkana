@@ -51,8 +51,17 @@ jobs:
             | sh -s -- -y --profile minimal
           echo "/root/.cargo/bin" >> "$GITHUB_PATH"
 
+      # JS actions (actions/checkout etc.) don't run in Alpine containers on
+      # ARM64 runners, so check out with plain git instead.
       - name: Checkout
-        uses: actions/checkout@v4
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git init -q
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c http.extraheader="Authorization: Bearer ${GITHUB_TOKEN}" fetch --depth 1 origin "$GITHUB_SHA"
+          git checkout -q --detach "$GITHUB_SHA"
 
       - name: Build release binary
         run: cargo build --release
