@@ -19,23 +19,40 @@ jobs:
   build:
     name: Build arkana for aarch64
     runs-on: ubuntu-24.04-arm
+    container: alpine:3.22
+    defaults:
+      run:
+        shell: sh
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
+          apk add --no-cache \
+            bash \
+            build-base \
+            ca-certificates \
+            curl \
             file \
             git \
-            pkg-config \
-            libgbm-dev \
+            linux-headers \
+            pkgconf \
+            fontconfig-dev \
+            freetype-dev \
+            gbm-dev \
+            libdrm-dev \
+            eudev-dev \
             libseat-dev \
-            libudev-dev \
-            libwayland-dev \
-            libxkbcommon-dev
+            libxkbcommon-dev \
+            wayland-dev \
+            gh
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal
+          echo "/root/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Build release binary
         run: cargo build --release
@@ -50,9 +67,9 @@ jobs:
       - name: Package artifacts
         run: |
           mkdir -p dist
-          cp target/release/arkana "dist/arkana-v${VERSION}-aarch64-unknown-linux-gnu"
+          cp target/release/arkana "dist/arkana-v${VERSION}-aarch64-unknown-linux-musl"
           cp README.md dist/
-          echo "arkana v${VERSION} (aarch64-unknown-linux-gnu)" > dist/VERSION.txt
+          echo "arkana v${VERSION} (aarch64-unknown-linux-musl)" > dist/VERSION.txt
 
       - name: Delete existing release for this version (idempotent re-runs)
         env:
@@ -64,9 +81,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v$VERSION" \
-            dist/arkana-v"$VERSION"-aarch64-unknown-linux-gnu \
+            dist/arkana-v"$VERSION"-aarch64-unknown-linux-musl \
             dist/README.md \
             dist/VERSION.txt \
             --title "arkana v$VERSION" \
-            --notes "Automated aarch64-unknown-linux-gnu build of arkana v$VERSION." \
+            --notes "Automated aarch64-unknown-linux-musl build of arkana v$VERSION." \
             ${{ github.event.inputs.draft == 'true' && '--draft' || '' }}

@@ -41,8 +41,11 @@ Currently the UI layout is fixed at **640×480**, so for now Arkana targets
 The default `cargo build` works on any Wayland desktop. On a
 native aarch64 machine (or via an [arm64 GitHub runner](.github/workflows/build-aarch64.yml))
 the same command produces the handheld binary; the build needs the KMS backend
-dependencies (`libgbm-dev`, `libseat-dev`, `libudev-dev`, `libxkbcommon-dev`,
-`pkg-config`) and the Wayland development headers.
+dependencies (`gbm`, `libseat`, `libudev`, `libxkbcommon`, `pkg-config`),
+`fontconfig`, and the Wayland development headers.
+
+The release workflow builds inside an **Alpine** container, so the published
+binary is statically tied to musl (`aarch64-unknown-linux-musl`).
 
 ## Building
 
