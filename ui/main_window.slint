@@ -67,7 +67,11 @@ export component MainWindow inherits Window {
                 property <int> index: i;
 
                 background: black;
-                data: game-data-array[parent.item-for-view(index) - 1];
+                data: game-data-array.length > 0
+                    ? game-data-array[parent.item-for-view(index) - 1]
+                    : { game_id: 0, title: "", cover_art: @image-url("") };
+
+                is_active: parent.position-offset(index) == 0 && !show-settings;
 
                 width: parent.width;
                 height: parent.height;

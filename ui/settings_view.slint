@@ -7,18 +7,18 @@ export component SettingsView inherits Rectangle {
     in property <string> command-output;
     callback run-command(int);
 
+    in-out property <bool> show-title: true;
+
     changed command-output => {
-        text.text = command-output;
-        text.horizontal-alignment = TextHorizontalAlignment.start;
-        text.vertical-alignment = TextVerticalAlignment.top;
+        if (command-output != "") {
+            show-title = false;
+        }
     }
 
     changed is_active => {
         if (is_active) {
             key-handler.focus();
-            text.text = title;
-            text.horizontal-alignment = TextHorizontalAlignment.center;
-            text.vertical-alignment = TextVerticalAlignment.center;
+            show-title = true;
         }
     }
 
@@ -49,16 +49,29 @@ export component SettingsView inherits Rectangle {
                 return reject;
             }
         }
+
+        title-text := Text {
+            visible: root.show-title;
+            text: title;
+            wrap: TextWrap.char-wrap;
+
+            // Center on the pixel grid so femtoVG does not sub-pixel smear
+            // odd-width titles. preferred-width is the text's natural size.
+            x: Math.round((parent.width - self.preferred-width) / 2 / 1px) * 1px;
+            y: Math.round((parent.height - self.preferred-height) / 2 / 1px) * 1px;
+        }
+
         scroll-view := ScrollView {
             width: parent.width;
             height: parent.height;
+            visible: !root.show-title;
 
             VerticalBox {
                 width: parent.width;
                 text := Text {
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                    text: title;
+                    horizontal-alignment: TextHorizontalAlignment.start;
+                    vertical-alignment: TextVerticalAlignment.top;
+                    text: command-output;
                     wrap: TextWrap.char-wrap;
                 }
             }

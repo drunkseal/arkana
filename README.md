@@ -35,8 +35,7 @@ Currently the UI layout is fixed at **640×480**, so for now Arkana targets
 
 - Linux (neither backend supports Windows/macOS)
 - Either bare DRM/KMS output (typical on the handheld) or a Wayland compositor
-- Rust with a recent stable toolchain. `slint` is pulled from git, so you need
-  `git` available at build time.
+- Rust with a recent stable toolchain.
 
 The default `cargo build` works on any Wayland desktop. On a
 native aarch64 machine (or via an [arm64 GitHub runner](.github/workflows/build-aarch64.yml))
@@ -108,14 +107,14 @@ the binary, then use the provided OpenRC service:
 
 ```sh
 cp target/<triple>/release/arkana /usr/bin/arkana
-cp packaging/arkana.initd /etc/init.d/arkana
+cp openrc/arkana.service /etc/init.d/arkana
 chmod +x /etc/init.d/arkana
 rc-update add arkana default
 rc-service arkana start
 ```
 
-See [packaging/README.md](packaging/README.md) for details on the DRM handoff
-and how the service coordinates with a launched game.
+See [openrc/README.md](openrc/README.md) for details on the DRM handoff and
+how the service coordinates with a launched game.
 
 ## Repository layout
 
@@ -128,5 +127,5 @@ src/
   launch.rs      Game launch + DRM handoff
   settings.rs    Settings commands and battery monitoring
 ui/              Slint UI (main window, slide view, game/settings views)
-packaging/       OpenRC init script
+openrc/          OpenRC service and packaging docs
 ```

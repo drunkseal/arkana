@@ -2,7 +2,7 @@
 
 ## Files
 
-- `arkana.initd` — OpenRC service that keeps the launcher running at all
+- `arkana.service` — OpenRC service that keeps the launcher running at all
   times, restarting it after a launched game exits.
 
 ## Why this exists
@@ -21,7 +21,7 @@ game keeps exclusive access to the display.
 cp target/<triple>/release/arkana /usr/bin/arkana
 
 # Install the init script and enable it
-cp packaging/arkana.initd /etc/init.d/arkana
+cp openrc/arkana.service /etc/init.d/arkana
 chmod +x /etc/init.d/arkana
 rc-update add arkana default
 rc-service arkana start

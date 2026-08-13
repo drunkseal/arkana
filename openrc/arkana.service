@@ -11,10 +11,10 @@
 # launcher, so the running game keeps exclusive access to the display.
 
 ARKANA_BIN="${ARKANA_BIN:-/usr/bin/arkana}"
-GAME_PIDFILE="${ARKANA_GAME_PIDFILE:-/run/arkana-game.pid}"
+ARKANA_GAME_PIDFILE="${ARKANA_GAME_PIDFILE:-/run/arkana-game.pid}"
 SUPERVISOR_PIDFILE="${ARKANA_SUPERVISOR_PIDFILE:-/run/arkana-supervisor.pid}"
 
-export ARKANA_BIN GAME_PIDFILE
+export ARKANA_BIN ARKANA_GAME_PIDFILE
 
 name="Arkana"
 description="Arkana launcher (restarts after launched games exit)"
@@ -29,14 +29,14 @@ start() {
     start-stop-daemon --start --background --make-pidfile \
         --pidfile "$SUPERVISOR_PIDFILE" --startas /bin/sh -- -c '
             while true; do
-                rm -f "$GAME_PIDFILE"
+                rm -f "$ARKANA_GAME_PIDFILE"
                 "$ARKANA_BIN"
-                if [ -f "$GAME_PIDFILE" ]; then
-                    pid=$(cat "$GAME_PIDFILE")
+                if [ -f "$ARKANA_GAME_PIDFILE" ]; then
+                    pid=$(cat "$ARKANA_GAME_PIDFILE")
                     while [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; do
                         sleep 0.2
                     done
-                    rm -f "$GAME_PIDFILE"
+                    rm -f "$ARKANA_GAME_PIDFILE"
                 fi
             done
         '
@@ -45,8 +45,8 @@ start() {
 
 stop() {
     ebegin "Stopping Arkana"
-    if [ -f "$GAME_PIDFILE" ]; then
-        pid=$(cat "$GAME_PIDFILE")
+    if [ -f "$ARKANA_GAME_PIDFILE" ]; then
+        pid=$(cat "$ARKANA_GAME_PIDFILE")
         [ -n "$pid" ] && kill "$pid" 2>/dev/null
     fi
     start-stop-daemon --stop --pidfile "$SUPERVISOR_PIDFILE" --retry SIGTERM

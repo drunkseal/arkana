@@ -1,4 +1,3 @@
-import { VerticalBox } from "std-widgets.slint";
 export struct GameViewData {
     game_id: int,
     title: string,
@@ -10,25 +9,69 @@ export component GameView inherits Rectangle {
     in property <bool> is_active: false;
     in property <GameViewData> data;
 
+    property <length> title-padding: 8px;
+
+    // Captured when the view becomes active, so the marquee always
+    // starts from the beginning instead of the middle of a cycle.
+    in-out property <duration> activate-time: 0s;
+
+    changed is_active => {
+        if (is_active) {
+            activate-time = animation-tick();
+        }
+    }
+
+    // Scroll offset for a title that overflows the bar: wait 2s at the start,
+    // swipe to the end over 1s, wait 2s, then swipe back over 1s.
+    // t is relative to the moment the game appeared on screen.
+    function marquee-offset(active: bool, text-width: length, avail-width: length, t: duration) -> length {
+        let overflow: length = text-width - avail-width;
+        if (!active || overflow <= 0px) {
+            return 0px;
+        }
+        let phase: float = Math.mod(t / 1s, 6);
+        if (phase < 2) {
+            return 0px;
+        } else if (phase < 3) {
+            let f: float = phase - 2;
+            return -1 * overflow * f;
+        } else if (phase < 5) {
+            return -1 * overflow;
+        } else {
+            let f: float = phase - 5;
+            return -1 * overflow * (1 - f);
+        }
+    }
+
     cover := Image {
         source: data.cover_art;
         width: parent.width;
         height: parent.height;
     }
 
-    VerticalBox {
-        width: parent.width;
-        height: parent.height - 20px;
+    title-bar := Rectangle {
+        visible: data.title != "";
+        background: beige;
+        clip: true;
 
-        title := Text {
-            vertical-alignment: bottom;
-            horizontal-alignment: left;
-            width: parent.width;
-            height: parent.height;
+        width: min(parent.width * 0.8, title-text.preferred-width + 2 * root.title-padding);
+        height: title-text.preferred-height + 2 * root.title-padding;
+
+        x: 0px;
+        y: parent.height - self.height;
+
+        title-text := Text {
             text: data.title;
-            color: beige;
-            wrap: word-wrap;
+            color: black;
+            wrap: TextWrap.no-wrap;
+
+            x: root.title-padding + root.marquee-offset(
+                root.is_active,
+                self.preferred-width,
+                title-bar.width - 2 * root.title-padding,
+                animation-tick() - root.activate-time
+            );
+            y: (parent.height - self.preferred-height) / 2;
         }
     }
-
 }

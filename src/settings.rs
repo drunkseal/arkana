@@ -1,4 +1,4 @@
-use std::{process::Output, thread};
+use std::{process::Output, thread, time::Duration};
 
 use crate::MainWindow;
 
@@ -21,29 +21,56 @@ impl From<u32> for CommandId {
 }
 
 pub fn execute_command(command: CommandId) -> String {
-    let output: Output = match command {
-        CommandId::Poweroff => std::process::Command::new("poweroff").output().unwrap(),
-        CommandId::Reboot => std::process::Command::new("reboot").output().unwrap(),
-        CommandId::IPInfo => std::process::Command::new("ip").arg("a").output().unwrap(),
+    let output: Result<Output, std::io::Error> = match command {
+        CommandId::Poweroff => std::process::Command::new("poweroff").output(),
+        CommandId::Reboot => std::process::Command::new("reboot").output(),
+        CommandId::IPInfo => std::process::Command::new("ip").arg("a").output(),
     };
-    String::from_utf8(output.stdout).unwrap()
+
+    match output {
+        Ok(output) => String::from_utf8_lossy(&output.stdout).into_owned(),
+        Err(err) => {
+            eprintln!("failed to run settings command: {err}");
+            String::from("(command failed)")
+        }
+    }
 }
 
 pub fn register_battery_watcher(weak_window: slint::Weak<MainWindow>) {
-    thread::spawn(move || -> Result<(), battery::Error> {
-        let battery_manager = battery::Manager::new().unwrap();
-        loop {
-            if let Some(Ok(battery)) = battery_manager.batteries()?.next() {
-                let percentage = (battery.state_of_charge().value * 100.0) as i32;
-                let weak_window = weak_window.clone();
-                slint::invoke_from_event_loop(move || {
-                    if let Some(window) = weak_window.upgrade() {
-                        window.set_battery_level(percentage);
-                    }
-                })
-                .unwrap();
-                thread::sleep(std::time::Duration::from_secs(10));
+    thread::spawn(move || {
+        let battery_manager = match battery::Manager::new() {
+            Ok(manager) => manager,
+            Err(err) => {
+                eprintln!("battery manager init error: {err}");
+                return;
             }
+        };
+
+        loop {
+            let mut found = false;
+            match battery_manager.batteries() {
+                Ok(batteries) => {
+                    for battery in batteries.flatten() {
+                        found = true;
+                        let percentage = (battery.state_of_charge().value * 100.0) as i32;
+                        let weak_window = weak_window.clone();
+                        slint::invoke_from_event_loop(move || {
+                            if let Some(window) = weak_window.upgrade() {
+                                window.set_battery_level(percentage);
+                            }
+                        })
+                        .ok();
+                    }
+                }
+                Err(err) => eprintln!("battery enumeration error: {err}"),
+            }
+
+            if !found {
+                // No battery present; there is nothing to watch.
+                return;
+            }
+
+            thread::sleep(Duration::from_secs(10));
         }
     });
 }
