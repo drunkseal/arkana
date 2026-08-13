@@ -1,15 +1,20 @@
 # Arkana
 
 A minimal, keyboard- and gamepad-driven launcher for a handheld Linux gaming
-device. It runs on bare DRM/KMS with no compositor, so it can hand the display
-straight to a game and take it back afterwards.
+device. It ships with two Slint backends: bare **DRM/KMS**, so on the handheld
+it acts as the only UI and can hand the display straight to a game and take it
+back afterwards, and **Wayland**, so the same binary also runs as a regular
+app under a compositor.
 
 Built with [Slint](https://slint.dev), it shows your installed games as a
 cover-art carousel, launches them on demand, and returns to the menu when the
 game exits.
 
+Currently the UI layout is fixed at **640×480**, so for now Arkana targets
+**R36S** handhelds. Making the resolution configurable is planned.
+
 ![Languages](https://img.shields.io/badge/language-Rust-orange)
-![Platform](https://img.shields.io/badge/platform-Linux%20(KMS)%20-%23800)
+![Platform](https://img.shields.io/badge/platform-Linux%20(KMS%20%2F%20Wayland)%20-orange)
 
 ## Features
 
@@ -28,15 +33,16 @@ game exits.
 
 ## Requirements
 
-- Linux (the KMS backend has no Windows/macOS support)
-- A system that boots to a console/DRM as above — no X11 or Wayland compositor
-  required. A Wayland backend is also enabled for development.
+- Linux (neither backend supports Windows/macOS)
+- Either bare DRM/KMS output (typical on the handheld) or a Wayland compositor
 - Rust with a recent stable toolchain. `slint` is pulled from git, so you need
   `git` available at build time.
 
-The default `cargo build` works for development on a Wayland desktop. For the
-target device (e.g. an ARM handheld), build with `cross` — see
-[Cross.toml](Cross.toml) for the configured targets.
+The default `cargo build` works on any Wayland desktop. On a
+native aarch64 machine (or via an [arm64 GitHub runner](.github/workflows/build-aarch64.yml))
+the same command produces the handheld binary; the build needs the KMS backend
+dependencies (`libgbm-dev`, `libseat-dev`, `libudev-dev`, `libxkbcommon-dev`,
+`pkg-config`) and the Wayland development headers.
 
 ## Building
 
@@ -44,11 +50,13 @@ target device (e.g. an ARM handheld), build with `cross` — see
 cargo build --release
 ```
 
-For an ARM/other device using `cross`:
+For the handheld, the [GitHub Actions workflow](.github/workflows/build-aarch64.yml)
+builds on a native aarch64 runner, installs the dependencies above, and
+publishes the binary — tagged with the app version from `Cargo.toml` — as a
+GitHub Release. Trigger it manually from the Actions tab.
 
-```sh
-cross build --release --target aarch64-unknown-linux-gnu
-```
+You can also cross-compile by hand; see [Cross.toml](Cross.toml) for the
+configured toolchain images.
 
 ## Configuration
 
