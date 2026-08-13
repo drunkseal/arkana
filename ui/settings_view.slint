@@ -1,0 +1,67 @@
+import { ScrollView, VerticalBox } from "std-widgets.slint";
+export component SettingsView inherits Rectangle {
+    clip: false;
+    in property <bool> is_active: false;
+    in-out property <string> title;
+    in property <int> command-id;
+    in property <string> command-output;
+    callback run-command(int);
+
+    changed command-output => {
+        text.text = command-output;
+        text.horizontal-alignment = TextHorizontalAlignment.start;
+        text.vertical-alignment = TextVerticalAlignment.top;
+    }
+
+    changed is_active => {
+        if (is_active) {
+            key-handler.focus();
+            text.text = title;
+            text.horizontal-alignment = TextHorizontalAlignment.center;
+            text.vertical-alignment = TextVerticalAlignment.center;
+        }
+    }
+
+    key-handler := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Return) {
+                run-command(command-id);
+                return accept;
+            } else if (command-output != "") {
+                let step : length = 40px;
+                let page_step : length = scroll_view.height - 20px;
+
+                // Calculate min/max bounds for viewport-y
+                // viewport-y ranges from 0 (top) down to -(viewport-height - scrollview-height)
+                let max_scroll : length = 0px;
+                let min_scroll : length = min(0px, scroll_view.height - scroll_view.viewport-height);
+
+                if (event.text == Key.UpArrow) {
+                    scroll_view.viewport-y = min(max_scroll, scroll_view.viewport-y + step);
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    scroll_view.viewport-y = max(min_scroll, scroll_view.viewport-y - step);
+                    return accept;
+                }
+                return reject;
+            } else {
+                return reject;
+            }
+        }
+        scroll-view := ScrollView {
+            width: parent.width;
+            height: parent.height;
+
+            VerticalBox {
+                width: parent.width;
+                text := Text {
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    text: title;
+                    wrap: TextWrap.char-wrap;
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,54 @@
+#!/sbin/openrc-run
+# OpenRC service for the Arkana launcher.
+#
+# The launcher owns the DRM/display device while it is running. Launching a
+# game makes the launcher process exit (releasing the device) and spawns a
+# detached shell that waits for the launcher to be gone, then runs the game.
+#
+# This service keeps the launcher running at all times: when the launcher
+# exits, we wait for the currently launched game to finish (we learn its
+# waiting shell's PID from /run/arkana-game.pid) before starting a fresh
+# launcher, so the running game keeps exclusive access to the display.
+
+ARKANA_BIN="${ARKANA_BIN:-/usr/bin/arkana}"
+GAME_PIDFILE="${ARKANA_GAME_PIDFILE:-/run/arkana-game.pid}"
+SUPERVISOR_PIDFILE="${ARKANA_SUPERVISOR_PIDFILE:-/run/arkana-supervisor.pid}"
+
+export ARKANA_BIN GAME_PIDFILE
+
+name="Arkana"
+description="Arkana launcher (restarts after launched games exit)"
+
+depend() {
+    need localmount
+    use modules
+}
+
+start() {
+    ebegin "Starting Arkana"
+    start-stop-daemon --start --background --make-pidfile \
+        --pidfile "$SUPERVISOR_PIDFILE" --startas /bin/sh -- -c '
+            while true; do
+                rm -f "$GAME_PIDFILE"
+                "$ARKANA_BIN"
+                if [ -f "$GAME_PIDFILE" ]; then
+                    pid=$(cat "$GAME_PIDFILE")
+                    while [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; do
+                        sleep 0.2
+                    done
+                    rm -f "$GAME_PIDFILE"
+                fi
+            done
+        '
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping Arkana"
+    if [ -f "$GAME_PIDFILE" ]; then
+        pid=$(cat "$GAME_PIDFILE")
+        [ -n "$pid" ] && kill "$pid" 2>/dev/null
+    fi
+    start-stop-daemon --stop --pidfile "$SUPERVISOR_PIDFILE" --retry SIGTERM
+    eend $?
+}

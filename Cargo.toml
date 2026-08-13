@@ -1,0 +1,19 @@
+[package]
+name = "arkana"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = [
+    "std",
+    "backend-linuxkms",
+    "backend-winit-wayland",
+    "renderer-femtovg",
+    "compat-1-2"
+] }
+battery = "0.7.8"
+gilrs = "0.11"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+[build-dependencies]
+slint-build = { git = "https://github.com/slint-ui/slint" }

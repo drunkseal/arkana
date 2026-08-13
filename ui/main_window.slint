@@ -1,0 +1,154 @@
+import "../assets/DepartureMono-Regular.otf";
+import { GameView, GameViewData } from "game_view.slint";
+import { SlideView } from "slide_view.slint";
+import { SettingsView } from "settings_view.slint";
+
+export component MainWindow inherits Window {
+    title: "Arkana";
+    background: black;
+    width: 640px;
+    height: 480px;
+
+    default-font-family: "Departure Mono";
+    default-font-size: 33px;
+
+    in-out property <[GameViewData]> game-data-array;
+
+    property <bool> show-settings: false;
+    in-out property <int> battery-level;
+
+    callback settings-run-command(int);
+    in-out property <string> settings-command-output;
+
+    callback current-game-changed(int);
+    callback launch-game(int);
+
+    property <int> game-current-index: game-slideview.current-item - 1;
+    changed game-current-index => {
+        root.current-game-changed(game-current-index);
+    }
+
+    changed show-settings => {
+        if (show-settings) {
+            settings-slideview.grab-focus();
+        } else {
+            game-slideview.grab-focus();
+        }
+    }
+
+    init => {
+        game-slideview.grab-focus();
+    }
+
+    main-handler := FocusScope {
+        width: parent.width;
+        height: parent.height;
+        focus-on-click: false;
+
+        key-pressed(event) => {
+            if (event.text == Key.Space) {
+                show-settings = !show-settings;
+                accept
+            } else if (event.text == Key.Return && !show-settings) {
+                root.launch-game(game-current-index);
+                accept
+            } else {
+                reject
+            }
+        }
+
+        game-slideview := SlideView {
+            width: parent.width;
+            height: parent.height;
+            list-size: game-data-array.length;
+            background: show-settings ? beige : black;
+
+            for i in [1, 2, 3]: GameView {
+                property <int> index: i;
+
+                background: black;
+                data: game-data-array[parent.item-for-view(index) - 1];
+
+                width: parent.width;
+                height: parent.height;
+
+                x: parent.position-offset(index) * parent.width;
+
+                animate x {
+                    duration:
+                        (index != parent.last-view-index
+                         && index != parent.current-view-index)
+                            ? 0ms
+                            : 250ms;
+
+                    easing: ease-in-out;
+                }
+            }
+        }
+
+        settings-slideview := SlideView {
+            width: parent.width;
+            height: parent.height;
+
+            list-size: 3;
+
+            x: parent.x;
+            y: show-settings ? parent.y : +parent.height;
+
+            animate y {
+                duration: 250ms;
+                easing: ease-in-out;
+            }
+
+            for i in [1, 2, 3]: SettingsView {
+                background: beige;
+
+                property <int> index: i;
+
+                is_active:
+                    index == parent.current-view-index
+                    && show-settings;
+
+                title:
+                    index == 1 ? "Power Off"
+                        : index == 2 ? "Reboot"
+                        : "IP Info";
+
+                command-id: index;
+
+                run-command(id) => {
+                    root.settings-run-command(id);
+                }
+
+                command-output: settings-command-output;
+
+                width: parent.width;
+                height: parent.height;
+
+                x: parent.position-offset(index) * parent.width;
+
+                animate x {
+                    duration:
+                        (index != parent.last-view-index
+                         && index != parent.current-view-index)
+                            ? 0ms
+                            : 250ms;
+
+                    easing: ease-in-out;
+                }
+            }
+        }
+    }
+
+    battery-indicator := Text {
+        text: battery-level + "%";
+
+        x: parent.width - self.width - 10px;
+        y: 10px;
+
+        color: beige;
+        visible: !show-settings;
+
+        font-size: 22px;
+    }
+}

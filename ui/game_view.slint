@@ -1,0 +1,34 @@
+import { VerticalBox } from "std-widgets.slint";
+export struct GameViewData {
+    game_id: int,
+    title: string,
+    cover_art: image
+}
+
+export component GameView inherits Rectangle {
+    clip: false;
+    in property <bool> is_active: false;
+    in property <GameViewData> data;
+
+    cover := Image {
+        source: data.cover_art;
+        width: parent.width;
+        height: parent.height;
+    }
+
+    VerticalBox {
+        width: parent.width;
+        height: parent.height - 20px;
+
+        title := Text {
+            vertical-alignment: bottom;
+            horizontal-alignment: left;
+            width: parent.width;
+            height: parent.height;
+            text: data.title;
+            color: beige;
+            wrap: word-wrap;
+        }
+    }
+
+}
