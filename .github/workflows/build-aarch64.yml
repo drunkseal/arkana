@@ -37,13 +37,13 @@ jobs:
             pkgconf \
             fontconfig-dev \
             freetype-dev \
-            gbm-dev \
+            mesa-dev \
             libdrm-dev \
             eudev-dev \
             libseat-dev \
             libxkbcommon-dev \
             wayland-dev \
-            gh
+            github-cli
 
       - name: Install Rust
         run: |
