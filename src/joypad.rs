@@ -1,9 +1,11 @@
+use std::sync::Arc;
 use std::thread;
 
 use gilrs::{Axis, Button, EventType, Gilrs};
 use slint::ComponentHandle;
 use slint::platform::{Key, WindowEvent};
 
+use crate::terminal::TerminalManager;
 use crate::MainWindow;
 
 const STICK_THRESHOLD: f32 = 0.5;
@@ -17,7 +19,10 @@ enum Dir {
     Down,
 }
 
-pub fn register_joypad(weak_window: slint::Weak<MainWindow>) {
+pub fn register_joypad(
+    weak_window: slint::Weak<MainWindow>,
+    terminal: Arc<TerminalManager>,
+) {
     thread::spawn(move || {
         let mut gilrs = match Gilrs::new() {
             Ok(g) => g,
@@ -29,19 +34,29 @@ pub fn register_joypad(weak_window: slint::Weak<MainWindow>) {
 
         let mut stick_x = Dir::None;
         let mut stick_y = Dir::None;
+        let mut l2 = false;
+        let mut r2 = false;
 
         while let Some(event) = gilrs.next_event() {
             match event.event {
-                EventType::ButtonPressed(button, _) => {
-                    if let Some(key) = button_to_key(button) {
-                        send_key(&weak_window, key, true);
+                EventType::ButtonPressed(button, _) => match button {
+                    Button::LeftTrigger2 => l2 = true,
+                    Button::RightTrigger2 => r2 = true,
+                    _ => {
+                        if let Some(key) = button_to_key(button) {
+                            send_key(&weak_window, key, true);
+                        }
                     }
-                }
-                EventType::ButtonReleased(button, _) => {
-                    if let Some(key) = button_to_key(button) {
-                        send_key(&weak_window, key, false);
+                },
+                EventType::ButtonReleased(button, _) => match button {
+                    Button::LeftTrigger2 => l2 = false,
+                    Button::RightTrigger2 => r2 = false,
+                    _ => {
+                        if let Some(key) = button_to_key(button) {
+                            send_key(&weak_window, key, false);
+                        }
                     }
-                }
+                },
                 EventType::AxisChanged(axis, value, _) => match axis {
                     Axis::LeftStickX => {
                         let new_dir = dir_from_x(value);
@@ -54,6 +69,14 @@ pub fn register_joypad(weak_window: slint::Weak<MainWindow>) {
                     _ => {}
                 },
                 _ => {}
+            }
+
+            // L2+R2 together terminates a running interactive program and
+            // returns to the settings list.
+            if l2 && r2 && terminal.is_running() {
+                terminal.kill(&weak_window);
+                l2 = false;
+                r2 = false;
             }
         }
     });
@@ -123,7 +146,9 @@ fn button_to_key(button: Button) -> Option<Key> {
         Button::DPadLeft => Some(Key::LeftArrow),
         Button::DPadRight => Some(Key::RightArrow),
         Button::South => Some(Key::Return),
-        Button::Start | Button::Select => Some(Key::Space),
+        Button::East => Some(Key::Backspace),
+        Button::Start => Some(Key::Space),
+        Button::Select => Some(Key::Menu),
         _ => None,
     }
 }

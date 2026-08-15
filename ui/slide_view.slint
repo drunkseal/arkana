@@ -8,6 +8,9 @@ export component SlideView inherits Rectangle {
     out property <int> current-view-index;
     out property <int> last-view-index;
 
+    // Fired after the selection moves to another item.
+    callback navigate();
+
     // The item currently displayed by each of the three visual slots.
     out property <int> view-item-1;
     out property <int> view-item-2;
@@ -90,6 +93,8 @@ export component SlideView inherits Rectangle {
 
         last-view-index = current-view-index;
         current-view-index = new-view-index;
+
+        navigate();
     }
 
     public function previous-item() {
@@ -121,6 +126,8 @@ export component SlideView inherits Rectangle {
 
         last-view-index = current-view-index;
         current-view-index = new-view-index;
+
+        navigate();
     }
 
     public function grab-focus() {

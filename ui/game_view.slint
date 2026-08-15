@@ -1,11 +1,15 @@
 export struct GameViewData {
     game_id: int,
     title: string,
-    cover_art: image
+    initial: string,
+    cover_art: image,
+    has-cover: bool,
+    c1: color,
+    c2: color,
 }
 
 export component GameView inherits Rectangle {
-    clip: false;
+    clip: true;
     in property <bool> is_active: false;
     in property <GameViewData> data;
 
@@ -43,10 +47,47 @@ export component GameView inherits Rectangle {
         }
     }
 
+    property <bool> has-cover: data.has-cover;
+
+    placeholder := Rectangle {
+        visible: !has-cover;
+
+        width: parent.width;
+        height: parent.height;
+
+        background: @linear-gradient(180deg, data.c1 0%, data.c2 100%);
+
+        frame := Rectangle {
+            x: 12px;
+            y: 12px;
+
+            width: parent.width - 24px;
+            height: parent.height - 24px;
+
+            border-width: 0px;
+            border-color: beige;
+            border-radius: 4px;
+
+            opacity: 0.6;
+        }
+
+        initial-text := Text {
+            text: data.initial;
+            color: beige;
+            opacity: 0.35;
+            font-size: 96px;
+
+            x: Math.round((parent.width - self.preferred-width) / 2 / 1px) * 1px;
+            y: Math.round((parent.height - self.preferred-height) / 2 / 1px) * 1px;
+        }
+    }
+
     cover := Image {
         source: data.cover_art;
         width: parent.width;
         height: parent.height;
+        image-fit: ImageFit.cover;
+        visible: has-cover;
     }
 
     title-bar := Rectangle {

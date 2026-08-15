@@ -44,6 +44,7 @@ jobs:
             libinput-dev \
             libxkbcommon-dev \
             wayland-dev \
+            alsa-lib-dev \
             github-cli
 
       - name: Install Rust

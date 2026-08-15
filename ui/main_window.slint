@@ -3,6 +3,13 @@ import { GameView, GameViewData } from "game_view.slint";
 import { SlideView } from "slide_view.slint";
 import { SettingsView } from "settings_view.slint";
 
+export struct SettingData {
+    setting-id: int,
+    title: string,
+    // 0 = command entry, 1 = volume bar, 2 = brightness bar.
+    kind: int,
+}
+
 export component MainWindow inherits Window {
     title: "Arkana";
     background: black;
@@ -13,15 +20,23 @@ export component MainWindow inherits Window {
     default-font-size: 33px;
 
     in-out property <[GameViewData]> game-data-array;
+    in-out property <[SettingData]> settings-data-array;
 
-    property <bool> show-settings: false;
+    in-out property <bool> show-settings: false;
     in-out property <int> battery-level;
 
     callback settings-run-command(int);
     in-out property <string> settings-command-output;
 
+    in-out property <string> terminal-output;
+    in-out property <bool> terminal-active;
+    in-out property <int> terminal-id;
+    callback terminal-key(string);
+    callback terminal-exit();
+
     callback current-game-changed(int);
     callback launch-game(int);
+    callback play-navigation-sound();
 
     property <int> game-current-index: game-slideview.current-item - 1;
     changed game-current-index => {
@@ -34,6 +49,7 @@ export component MainWindow inherits Window {
         } else {
             game-slideview.grab-focus();
         }
+        root.play-navigation-sound();
     }
 
     init => {
@@ -63,13 +79,23 @@ export component MainWindow inherits Window {
             list-size: game-data-array.length;
             background: show-settings ? beige : black;
 
+            navigate() => { root.play-navigation-sound(); }
+
             for i in [1, 2, 3]: GameView {
                 property <int> index: i;
 
                 background: black;
                 data: game-data-array.length > 0
                     ? game-data-array[parent.item-for-view(index) - 1]
-                    : { game_id: 0, title: "", cover_art: @image-url("") };
+                    : {
+                        game_id: 0,
+                        title: "",
+                        initial: "",
+                        cover_art: @image-url(""),
+                        has-cover: false,
+                        c1: #000000,
+                        c2: #000000
+                    };
 
                 is_active: parent.position-offset(index) == 0 && !show-settings;
 
@@ -94,7 +120,9 @@ export component MainWindow inherits Window {
             width: parent.width;
             height: parent.height;
 
-            list-size: 3;
+            list-size: settings-data-array.length;
+
+            navigate() => { root.play-navigation-sound(); }
 
             x: parent.x;
             y: show-settings ? parent.y : +parent.height;
@@ -105,26 +133,37 @@ export component MainWindow inherits Window {
             }
 
             for i in [1, 2, 3]: SettingsView {
-                background: beige;
-
                 property <int> index: i;
 
                 is_active:
                     index == parent.current-view-index
                     && show-settings;
 
-                title:
-                    index == 1 ? "Power Off"
-                        : index == 2 ? "Reboot"
-                        : "IP Info";
+                background: beige;
 
-                command-id: index;
+                title: settings-data-array.length > 0
+                    ? settings-data-array[parent.item-for-view(index) - 1].title
+                    : "";
+
+                command-id: settings-data-array.length > 0
+                    ? settings-data-array[parent.item-for-view(index) - 1].setting-id
+                    : 0;
+
+                view-kind: settings-data-array.length > 0
+                    ? settings-data-array[parent.item-for-view(index) - 1].kind
+                    : 0;
 
                 run-command(id) => {
                     root.settings-run-command(id);
                 }
 
                 command-output: settings-command-output;
+
+                terminal-active: root.terminal-active;
+                terminal-id: root.terminal-id;
+                terminal-output: root.terminal-output;
+                terminal-key(text) => { root.terminal-key(text); }
+                terminal-exit() => { root.terminal-exit(); }
 
                 width: parent.width;
                 height: parent.height;

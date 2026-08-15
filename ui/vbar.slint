@@ -1,0 +1,18 @@
+export component VBar inherits Rectangle {
+    in property <int> level: 50;
+
+    background: black;
+    border-width: 6px;
+    border-color: black;
+    clip: true;
+
+    filler := Rectangle {
+        background: beige;
+
+        x: 9px;
+        width: parent.width - 18px;
+
+        y: parent.height - self.height - 9px;
+        height: (parent.height - 18px) * root.level / 100;
+    }
+}

@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use slint::{Image, Model, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel};
+use slint::{Color, Image, Model, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel};
 
 use crate::entries::GameEntry;
 use crate::GameViewData;
@@ -29,7 +29,8 @@ pub struct CoverState {
 }
 
 impl CoverState {
-    /// Build the game list model with placeholder covers.
+    /// Build the game list model, computing gradient colors up front for
+    /// every game.
     pub fn build_model(games: &[GameEntry]) -> Rc<VecModel<GameViewData>> {
         Rc::new(VecModel::from(
             games
@@ -159,11 +160,62 @@ fn decode_cover(path: &Path, max_dim: u32) -> Option<SharedPixelBuffer<Rgba8Pixe
 }
 
 fn view_data(game: &GameEntry, cover_art: Image) -> GameViewData {
+    let (c1, c2) = placeholder_colors(&game.name);
+    let initial = game
+        .name
+        .chars()
+        .next()
+        .map(|c| c.to_uppercase().to_string())
+        .unwrap_or_default()
+        .into();
+    let has_cover = cover_art.size().width > 0;
     GameViewData {
         title: game.name.clone().into(),
         game_id: game.id as i32,
+        initial,
         cover_art,
+        has_cover,
+        c1,
+        c2,
     }
+}
+
+/// Derive a muted but colorful vertical gradient (top color, bottom color)
+/// from a stable hash of the game title.
+fn placeholder_colors(name: &str) -> (Color, Color) {
+    const SATURATION: f64 = 0.55;
+    const TOP_LIGHTNESS: f64 = 0.30;
+    const BOTTOM_LIGHTNESS: f64 = 0.08;
+
+    let hue = name
+        .bytes()
+        .fold(0u32, |acc, byte| acc.wrapping_mul(31).wrapping_add(byte as u32))
+        % 360;
+    (
+        hsl_color(hue as f64, SATURATION, TOP_LIGHTNESS),
+        hsl_color(hue as f64, SATURATION, BOTTOM_LIGHTNESS),
+    )
+}
+
+/// Convert HSL (hue 0-360, s/l 0-1) to an opaque RGB color.
+fn hsl_color(hue: f64, saturation: f64, lightness: f64) -> Color {
+    let chroma = (1.0 - (2.0 * lightness - 1.0).abs()) * saturation;
+    let hp = hue / 60.0;
+    let x = chroma * (1.0 - (hp % 2.0 - 1.0).abs());
+    let (r1, g1, b1) = match hp as u32 {
+        0 => (chroma, x, 0.0),
+        1 => (x, chroma, 0.0),
+        2 => (0.0, chroma, x),
+        3 => (0.0, x, chroma),
+        4 => (x, 0.0, chroma),
+        _ => (chroma, 0.0, x),
+    };
+    let m = lightness - chroma / 2.0;
+    Color::from_rgb_u8(
+        ((r1 + m) * 255.0).round() as u8,
+        ((g1 + m) * 255.0).round() as u8,
+        ((b1 + m) * 255.0).round() as u8,
+    )
 }
 
 fn circular_distance(a: usize, b: usize, n: usize) -> usize {

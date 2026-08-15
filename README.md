@@ -41,13 +41,14 @@ The default `cargo build` works on any Wayland desktop. On a
 native aarch64 machine (or via an [arm64 GitHub runner](.github/workflows/build-aarch64.yml))
 the same command produces the handheld binary; the build needs the KMS backend
 dependencies (`gbm`, `libseat`, `libudev`, `libxkbcommon`, `pkg-config`),
-`fontconfig`, and the Wayland development headers.
+`fontconfig`, the Wayland development headers, and the ALSA development
+headers (`libasound2-dev`, `alsa-lib-dev` on Alpine).
 
 The release workflow builds inside an **Alpine** container, so the published
 binary is based on musl (`aarch64-unknown-linux-musl`). Alpine ships only
 dynamic libraries, so the binary links the system libs at runtime and needs
 `libseat`, `libinput`, `libxkbcommon`, `fontconfig`, `freetype`, `gbm`, `drm`,
-`udev`, and Wayland client libs installed on the target device.
+`alsa-lib`, `udev`, and Wayland client libs installed on the target device.
 
 ## Building
 

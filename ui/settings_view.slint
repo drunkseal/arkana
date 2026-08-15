@@ -1,18 +1,156 @@
 import { ScrollView, VerticalBox } from "std-widgets.slint";
+import { VBar } from "vbar.slint";
 export component SettingsView inherits Rectangle {
     clip: false;
     in property <bool> is_active: false;
     in-out property <string> title;
     in property <int> command-id;
+    // 0 = command entry, 1 = volume bar, 2 = brightness bar.
+    in property <int> view-kind: 0;
     in property <string> command-output;
     callback run-command(int);
 
+    in property <bool> terminal-active: false;
+    in property <int> terminal-id: 0;
+    in property <string> terminal-output;
+    callback terminal-key(string);
+    callback terminal-exit();
+
+    // This entry's terminal mode is on when a session is running for it.
+    private property <bool> in-terminal: terminal-active && (command-id == terminal-id);
+
     in-out property <bool> show-title: true;
+
+    // UI-only volume/brightness placeholders (no hardware control yet). Each
+    // bar owns a whole settings view; the pad adjusts its level.
+    private property <int> volume-level: 50;
+    private property <int> brightness-level: 50;
+
+    function adjust-bar(delta: int) {
+        if (view-kind == 1) {
+            volume-level = max(0, min(100, volume-level + delta));
+        } else if (view-kind == 2) {
+            brightness-level = max(0, min(100, brightness-level + delta));
+        }
+    }
+
+    // ---- On-screen keyboard (shown for virtual-pty programs) ----
+    // The grid: rows 0-2 hold 30 characters from one of two "layouts"
+    // (letters vs. symbols), row 3 holds four action keys.
+    private property <bool> osk-open: true;
+    private property <bool> osk-symbols: false;
+    private property <int> osk-index: 0;
+    // Height the on-screen keyboard occupies. The terminal shares this value
+    // so it always ends where the keyboard begins: 0 px when the keyboard is
+    // hidden, 200 px when it is shown.
+    private property <length> osk-height: root.osk-open ? 200px : 0px;
+
+    private property <[string]> osk-abc: [
+        "Q","W","E","R","T","Y","U","I","O","P",
+        "A","S","D","F","G","H","J","K","L",";",
+        "Z","X","C","V","B","N","M",",",".","/"
+    ];
+    private property <[string]> osk-num: [
+        "1","2","3","4","5","6","7","8","9","0",
+        "-","+","=","_","(",")","[","]",":","'",
+        "!", "@", "#", "$", "%", "^", "&", "*", "?", ">"
+    ];
+    private property <[int]> osk-key-index: [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+        30, 31, 32, 33
+    ];
+
+    function osk-row(i: int) -> int {
+        if (i < 30) { i / 10 } else { 3 }
+    }
+    function osk-col(i: int) -> int {
+        if (i < 30) { Math.mod(i, 10) } else { i - 30 }
+    }
+    function osk-label(i: int) -> string {
+        if (i < 30) {
+            if (osk-symbols) { osk-num[i] } else { osk-abc[i] }
+        } else if (i == 30) {
+            if (osk-symbols) { "ABC" } else { "123" }
+        } else if (i == 31) {
+            "space"
+        } else if (i == 32) {
+            "BACK"
+        } else {
+            "SEND"
+        }
+    }
+
+    // Pad navigation on the 4x3 character grid plus the action row.
+    function osk-up() {
+        if (osk-row(osk-index) == 3) {
+            osk-index = 20 + min(osk-col(osk-index), 9);
+        } else if (osk-row(osk-index) > 0) {
+            osk-index = (osk-row(osk-index) - 1) * 10 + osk-col(osk-index);
+        }
+    }
+    function osk-down() {
+        if (osk-row(osk-index) == 2) {
+            osk-index = 30 + min(osk-col(osk-index), 3);
+        } else if (osk-row(osk-index) < 2) {
+            osk-index = (osk-row(osk-index) + 1) * 10 + osk-col(osk-index);
+        }
+    }
+    function osk-left() {
+        if (osk-row(osk-index) == 3) {
+            osk-index = 30 + Math.mod(osk-col(osk-index) - 1 + 4, 4);
+        } else {
+            osk-index = (osk-row(osk-index) * 10) + Math.mod(osk-col(osk-index) - 1 + 10, 10);
+        }
+    }
+    function osk-right() {
+        if (osk-row(osk-index) == 3) {
+            osk-index = 30 + Math.mod(osk-col(osk-index) + 1, 4);
+        } else {
+            osk-index = (osk-row(osk-index) * 10) + Math.mod(osk-col(osk-index) + 1, 10);
+        }
+    }
+
+    // Press the focused key: mutates the keyboard state and returns the text
+    // to send to the pty ("" for the mode toggle). Invoked by Return on the
+    // pad or by tapping the key.
+    function osk-activate() -> string {
+        if (osk-index == 30) {
+            osk-symbols = !osk-symbols;
+            osk-index = 0;
+            return "";
+        } else if (osk-index == 31) {
+            return " ";
+        } else if (osk-index == 32) {
+            return "\u{8}";
+        } else if (osk-index == 33) {
+            return "\u{d}";
+        } else {
+            return osk-label(osk-index);
+        }
+    }
 
     changed command-output => {
         if (command-output != "") {
             show-title = false;
         }
+    }
+
+    changed in-terminal => {
+        if (in-terminal) {
+            // Re-open the on-screen keyboard for every pty session.
+            osk-open = true;
+        } else {
+            show-title = true;
+            osk-open = false;
+        }
+    }
+
+    // Keep the newest output in view: after every screen update, scroll the
+    // terminal to the bottom (a no-op when the content already fits).
+    changed terminal-output => {
+        term-scroll.viewport-y = min(0px, term-scroll.height - term-scroll.viewport-height);
     }
 
     changed is_active => {
@@ -24,7 +162,68 @@ export component SettingsView inherits Rectangle {
 
     key-handler := FocusScope {
         key-pressed(event) => {
-            if (event.text == Key.Return) {
+            if (root.in-terminal) {
+                if (root.osk-open) {
+                    // With the on-screen keyboard up, the pad moves the key
+                    // cursor, Return types the selected key, and Backspace
+                    // deletes. A real keyboard can still exit via Escape.
+                    if (event.text == Key.UpArrow) { root.osk-up(); return accept; }
+                    if (event.text == Key.DownArrow) { root.osk-down(); return accept; }
+                    if (event.text == Key.LeftArrow) { root.osk-left(); return accept; }
+                    if (event.text == Key.RightArrow) { root.osk-right(); return accept; }
+                    if (event.text == Key.Return) {
+                        let send : string = root.osk-activate();
+                        if (send != "") {
+                            root.terminal-key(send);
+                        }
+                        return accept;
+                    }
+                    if (event.text == Key.Backspace) {
+                        root.terminal-key("\u{8}");
+                        return accept;
+                    }
+                    // The Select/Menu button hides the keyboard again.
+                    if (event.text == Key.Menu) {
+                        root.osk-open = false;
+                        return accept;
+                    }
+                    if (event.text == Key.Escape) {
+                        root.terminal-exit();
+                    }
+                    return accept;
+                }
+
+                // Scroll the terminal output, mirroring the command output.
+                // Only a keyboard Escape or the L2+R2 combo exits the program;
+                // every other key goes to the running program.
+                if (event.text == Key.Escape) {
+                    root.terminal-exit();
+                    return accept;
+                }
+
+                // The Select/Menu button opens the on-screen keyboard.
+                if (event.text == Key.Menu) {
+                    root.osk-open = true;
+                    root.osk-index = 0;
+                    return accept;
+                }
+
+                let step : length = 40px;
+
+                let max_scroll : length = 0px;
+                let min_scroll : length = min(0px, term-scroll.height - term-scroll.viewport-height);
+
+                if (event.text == Key.UpArrow) {
+                    term-scroll.viewport-y = min(max_scroll, term-scroll.viewport-y + step);
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    term-scroll.viewport-y = max(min_scroll, term-scroll.viewport-y - step);
+                    return accept;
+                }
+                root.terminal-key(event.text);
+                return accept;
+            } else if (event.text == Key.Return) {
                 run-command(command-id);
                 return accept;
             } else if (command-output != "") {
@@ -46,12 +245,23 @@ export component SettingsView inherits Rectangle {
                 }
                 return reject;
             } else {
+                // Volume/brightness bar views: the pad raises/lowers the level.
+                if (root.view-kind == 1 || root.view-kind == 2) {
+                    if (event.text == Key.UpArrow) {
+                        root.adjust-bar(1);
+                        return accept;
+                    }
+                    if (event.text == Key.DownArrow) {
+                        root.adjust-bar(-1);
+                        return accept;
+                    }
+                }
                 return reject;
             }
         }
 
         title-text := Text {
-            visible: root.show-title;
+            visible: root.show-title && !root.in-terminal && root.view-kind == 0;
             text: title;
             wrap: TextWrap.char-wrap;
 
@@ -64,7 +274,7 @@ export component SettingsView inherits Rectangle {
         scroll-view := ScrollView {
             width: parent.width;
             height: parent.height;
-            visible: !root.show-title;
+            visible: !root.show-title && !root.in-terminal;
 
             VerticalBox {
                 width: parent.width;
@@ -75,6 +285,122 @@ export component SettingsView inherits Rectangle {
                     wrap: TextWrap.char-wrap;
                 }
             }
+        }
+    }
+
+    term-view := Rectangle {
+        visible: root.in-terminal;
+        background: black;
+        width: parent.width;
+        height: parent.height;
+
+        caption := Text {
+            text: title + "    [ESC / L2+R2 exit, Select: OSK]";
+            font-size: 11px;
+            color: beige;
+            x: 8px;
+            y: 6px;
+        }
+
+        term-scroll := ScrollView {
+            width: parent.width;
+            // End exactly where the keyboard starts; when the keyboard is
+            // hidden the terminal fills the whole view.
+            height: parent.height - 26px - root.osk-height;
+            y: 26px;
+
+            VerticalBox {
+                width: parent.width;
+                output := Text {
+                    horizontal-alignment: TextHorizontalAlignment.start;
+                    vertical-alignment: TextVerticalAlignment.top;
+                    text: root.terminal-output;
+                    color: beige;
+                    // Departure Mono is 350/550 = 0.636em per cell, so 80
+                    // columns at 11px fit the 640px screen comfortably.
+                    font-size: 11px;
+                    wrap: TextWrap.char-wrap;
+                }
+            }
+        }
+
+        osk-box := Rectangle {
+            visible: root.osk-open;
+            background: black;
+            border-width: 2px;
+            border-color: beige;
+            x: 0px;
+            y: parent.height - root.osk-height;
+            width: parent.width;
+            height: root.osk-height;
+
+            for i in root.osk-key-index: Rectangle {
+                x: root.osk-row(i) == 3 ? root.osk-col(i) * 160px : root.osk-col(i) * 64px;
+                y: root.osk-row(i) == 3 ? 138px : root.osk-row(i) * 46px;
+                width: root.osk-row(i) == 3 ? 160px : 64px;
+                height: root.osk-row(i) == 3 ? 62px : 46px;
+
+                background: (i == root.osk-index) ? beige : black;
+                border-width: (i == root.osk-index) ? 0px : 1px;
+                border-color: beige;
+
+                Text {
+                    text: root.osk-label(i);
+                    color: (i == root.osk-index) ? black : beige;
+                    font-size: 22px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    width: parent.width;
+                    height: parent.height;
+                }
+
+                key-hit := TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    clicked => {
+                        root.osk-index = i;
+                        let send : string = root.osk-activate();
+                        if (send != "") {
+                            root.terminal-key(send);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Volume/brightness views: each bar is its own settings entry. The bar sits
+    // on the left with the title above-right of it and the percentage below.
+    bar-view := Rectangle {
+        visible: root.show-title && !root.in-terminal && (root.view-kind == 1 || root.view-kind == 2);
+        width: parent.width;
+        height: parent.height;
+
+        body-bar := VBar {
+            level: root.view-kind == 1 ? root.volume-level : root.brightness-level;
+            x: 60px;
+            y: 40px;
+            width: 90px;
+            height: 400px;
+        }
+
+        bar-title := Text {
+            text: root.title;
+            color: black;
+            font-size: 33px;
+            // Right of the bar, its top on the same ceiling as the bar.
+            x: Math.round((body-bar.x + body-bar.width + 24px) / 1px) * 1px;
+            y: Math.round((body-bar.y) / 1px) * 1px;
+            wrap: TextWrap.word-wrap;
+        }
+
+        bar-percent := Text {
+            text: (root.view-kind == 1 ? root.volume-level : root.brightness-level) + " %";
+            color: black;
+            font-size: 33px;
+            // Right of the bar, its bottom on the same floor as the bar.
+            x: Math.round((body-bar.x + body-bar.width + 24px) / 1px) * 1px;
+            y: Math.round((body-bar.y + body-bar.height - self.preferred-height) / 1px) * 1px;
         }
     }
 }
