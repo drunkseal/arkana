@@ -146,6 +146,6 @@ jobs:
           gh release create "v$VERSION" \
             arkana-gnu/arkana-v"$VERSION"-aarch64-unknown-linux-gnu \
             arkana-musl/arkana-v"$VERSION"-aarch64-unknown-linux-musl \
-            --title "arkana v$VERSION" \
+            --title "v$VERSION" \
             --notes "Automated aarch64 builds of arkana v$VERSION (gnu + musl)." \
             ${{ github.event.inputs.draft == 'true' && '--draft' || '' }}
