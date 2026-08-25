@@ -115,7 +115,7 @@ jobs:
           export GIT_TERMINAL_PROMPT=0
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git init -q
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ GITHUB_REPOSITORY }}.git"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git fetch --depth 1 origin "$GITHUB_SHA"
           git checkout -q --detach "$GITHUB_SHA"
 
