@@ -1,0 +1,30 @@
+# Copyright © SixtyFPS GmbH <info@slint.dev>
+# SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0
+
+[alias]
+xtask = "run --locked --package xtask --"
+
+[target.xtensa-esp32s3-none-elf]
+rustflags = [
+  "-C",
+  "link-arg=-nostartfiles",
+  # Without this flag, we get miscompilation of floating point operations that cause the clipping region to be totally wrong
+  "-C",
+  "target-feature=-fp",
+]
+
+[target.xtensa-esp32s2-none-elf]
+rustflags = [
+  # Enable the atomic codegen option for Xtensa
+  "-C",
+  "target-feature=+s32c1i",
+]
+
+[target.x86_64-pc-windows-msvc]
+# Increase default stack size to avoid running out of stack
+# space in debug builds. The size matches Linux's default.
+rustflags = ["-C", "link-arg=/STACK:8000000"]
+[target.aarch64-pc-windows-msvc]
+# Increase default stack size to avoid running out of stack
+# space in debug builds. The size matches Linux's default.
+rustflags = ["-C", "link-arg=/STACK:8000000"]

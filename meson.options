@@ -1,0 +1,2 @@
+option('alsa', type: 'boolean', value: true,
+       description: 'Enable ALSA audio for navigation sounds')

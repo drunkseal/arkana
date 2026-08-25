@@ -1,3 +1,6 @@
-/target
+/builddir
 /test_apps
-/Cargo.lock
+/compile_commands.json
+/.clangd
+/subprojects/packagecache/
+/.cache/

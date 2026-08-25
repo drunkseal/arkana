@@ -18,7 +18,7 @@ game keeps exclusive access to the display.
 
 ```sh
 # Install the launcher binary
-cp target/<triple>/release/arkana /usr/bin/arkana
+cp builddir/src/arkana /usr/bin/arkana
 
 # Install the init script and enable it
 cp openrc/arkana.service /etc/init.d/arkana

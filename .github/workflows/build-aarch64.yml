@@ -12,12 +12,65 @@ on:
 permissions:
   contents: write
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  build:
-    name: Build arkana for aarch64
+  build-gnu:
+    name: Build arkana (aarch64-gnu)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            meson \
+            ninja-build \
+            cmake \
+            pkg-config \
+            libfontconfig-dev \
+            libfreetype-dev \
+            libdrm-dev \
+            libgbm-dev \
+            libseat-dev \
+            libinput-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libasound2-dev \
+            linux-headers-generic
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          meson setup builddir
+          meson compile -C builddir
+
+      - name: Resolve app version
+        id: version
+        run: |
+          VERSION="$(meson introspect --projectinfo builddir | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])')"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Package gnu artifact
+        run: |
+          mkdir -p dist
+          cp builddir/arkana "dist/arkana-v${VERSION}-aarch64-unknown-linux-gnu"
+
+      - name: Upload gnu artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkana-gnu
+          path: dist/arkana-v${{ steps.version.outputs.version }}-aarch64-unknown-linux-gnu
+
+  build-musl:
+    name: Build arkana (aarch64-musl)
     runs-on: ubuntu-24.04-arm
     container: alpine:3.22
     defaults:
@@ -31,10 +84,12 @@ jobs:
             build-base \
             ca-certificates \
             curl \
-            file \
             git \
             linux-headers \
             pkgconf \
+            meson \
+            ninja \
+            cmake \
             fontconfig-dev \
             freetype-dev \
             mesa-dev \
@@ -45,7 +100,7 @@ jobs:
             libxkbcommon-dev \
             wayland-dev \
             alsa-lib-dev \
-            github-cli
+            python3
 
       - name: Install Rust
         run: |
@@ -53,9 +108,6 @@ jobs:
             | sh -s -- -y --profile minimal
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      # JS actions (actions/checkout etc.) don't run in Alpine containers on
-      # ARM64 runners, so check out with plain git instead. Use Basic auth
-      # (x-access-token) — git does not accept OAuth Bearer tokens.
       - name: Checkout
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -63,31 +115,52 @@ jobs:
           export GIT_TERMINAL_PROMPT=0
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git init -q
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ GITHUB_REPOSITORY }}.git"
           git fetch --depth 1 origin "$GITHUB_SHA"
           git checkout -q --detach "$GITHUB_SHA"
 
-      # Alpine ships only shared libs (no static archives), so disable musl's
-      # default fully-static CRT and link dynamically against them.
-      - name: Build release binary
+      - name: Build
+        env:
+          RUSTFLAGS: "-C target-feature=-crt-static"
         run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          export RUSTFLAGS="-C target-feature=-crt-static"
-          cargo build --release
+          meson setup builddir
+          meson compile -C builddir
 
       - name: Resolve app version
         id: version
         run: |
-          VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')"
+          VERSION="$(meson introspect --projectinfo builddir | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])')"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Package artifacts
+      - name: Package musl artifact
         run: |
           mkdir -p dist
-          cp target/release/arkana "dist/arkana-v${VERSION}-aarch64-unknown-linux-musl"
-          cp README.md dist/
-          echo "arkana v${VERSION} (aarch64-unknown-linux-musl)" > dist/VERSION.txt
+          cp builddir/arkana "dist/arkana-v${VERSION}-aarch64-unknown-linux-musl"
+
+      - name: Upload musl artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkana-musl
+          path: dist/arkana-v${{ steps.version.outputs.version }}-aarch64-unknown-linux-musl
+
+  release:
+    name: Create GitHub release
+    needs: [build-gnu, build-musl]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Resolve app version
+        id: version
+        run: |
+          VERSION="$(grep -m1 "version:" meson.build | sed "s/.*version:[[:space:]]*'\\([^']*\\)'.*/\\1/")"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Delete existing release for this version (idempotent re-runs)
         env:
@@ -99,9 +172,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v$VERSION" \
-            dist/arkana-v"$VERSION"-aarch64-unknown-linux-musl \
-            dist/README.md \
-            dist/VERSION.txt \
+            arkana-gnu/arkana-v"$VERSION"-aarch64-unknown-linux-gnu \
+            arkana-musl/arkana-v"$VERSION"-aarch64-unknown-linux-musl \
             --title "arkana v$VERSION" \
-            --notes "Automated aarch64-unknown-linux-musl build of arkana v$VERSION." \
+            --notes "Automated aarch64 builds of arkana v$VERSION (gnu + musl)." \
             ${{ github.event.inputs.draft == 'true' && '--draft' || '' }}
