@@ -63,7 +63,7 @@ jobs:
       - name: Package gnu artifact
         run: |
           mkdir -p dist
-          cp builddir/arkana "dist/arkana-v${VERSION}-aarch64-unknown-linux-gnu"
+          strip builddir/arkana -o "dist/arkana-v${VERSION}-aarch64-unknown-linux-gnu"
 
       - name: Upload gnu artifact
         uses: actions/upload-artifact@v4
@@ -108,7 +108,7 @@ jobs:
       - name: Package musl artifact
         run: |
           mkdir -p dist
-          cp builddir/arkana "dist/arkana-v${{ steps.version.outputs.version }}-aarch64-unknown-linux-musl"
+          strip builddir/arkana -o "dist/arkana-v${{ steps.version.outputs.version }}-aarch64-unknown-linux-musl"
 
       - name: Upload musl artifact
         uses: actions/upload-artifact@v4
