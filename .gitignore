@@ -1,5 +1,4 @@
-/builddir
-/test_apps
+/builddir/
 /compile_commands.json
 /.clangd
 /subprojects/packagecache/

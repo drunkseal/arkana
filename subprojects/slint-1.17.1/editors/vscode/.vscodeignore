@@ -1,6 +1,0 @@
-**/*.ts
-**/tsconfig.json
-tsconfig.default.json
-tests/
-.vscode/
-bin/*.d

@@ -1,5 +1,0 @@
-
-dist
-dist.zip
-.tmp
-!*.d.ts
