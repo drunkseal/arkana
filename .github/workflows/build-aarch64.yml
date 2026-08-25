@@ -24,7 +24,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
+            g++-14 \
             meson \
             ninja-build \
             cmake \
@@ -47,6 +47,8 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Build
+        env:
+          CXX: g++-14
         run: |
           meson setup builddir
           meson compile -C builddir
@@ -72,71 +74,41 @@ jobs:
   build-musl:
     name: Build arkana (aarch64-musl)
     runs-on: ubuntu-24.04-arm
-    container: alpine:3.22
-    defaults:
-      run:
-        shell: sh
     steps:
-      - name: Install build dependencies
-        run: |
-          apk add --no-cache \
-            bash \
-            build-base \
-            ca-certificates \
-            curl \
-            git \
-            linux-headers \
-            pkgconf \
-            meson \
-            ninja \
-            cmake \
-            fontconfig-dev \
-            freetype-dev \
-            mesa-dev \
-            libdrm-dev \
-            eudev-dev \
-            libseat-dev \
-            libinput-dev \
-            libxkbcommon-dev \
-            wayland-dev \
-            alsa-lib-dev \
-            python3
-
-      - name: Install Rust
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-            | sh -s -- -y --profile minimal
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
       - name: Checkout
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          export GIT_TERMINAL_PROMPT=0
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git init -q
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth 1 origin "$GITHUB_SHA"
-          git checkout -q --detach "$GITHUB_SHA"
-
-      - name: Build
-        env:
-          RUSTFLAGS: "-C target-feature=-crt-static"
-        run: |
-          meson setup builddir
-          meson compile -C builddir
+        uses: actions/checkout@v4
 
       - name: Resolve app version
         id: version
         run: |
-          VERSION="$(meson introspect --projectinfo builddir | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])')"
+          VERSION="$(grep -m1 "version:" meson.build | sed "s/.*version:[[:space:]]*'\\([^']*\\)'.*/\\1/")"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build in Alpine container
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            -e RUSTFLAGS="-C target-feature=-crt-static" \
+            alpine:3.22 \
+            sh -c '
+              apk add --no-cache \
+                bash build-base ca-certificates curl git linux-headers \
+                pkgconf meson ninja cmake fontconfig-dev freetype-dev \
+                mesa-dev libdrm-dev eudev-dev libseat-dev libinput-dev \
+                libxkbcommon-dev wayland-dev alsa-lib-dev python3 &&
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
+                | sh -s -- -y --profile minimal &&
+              export PATH="$HOME/.cargo/bin:$PATH" &&
+              meson setup builddir &&
+              meson compile -C builddir
+            '
 
       - name: Package musl artifact
         run: |
           mkdir -p dist
-          cp builddir/arkana "dist/arkana-v${VERSION}-aarch64-unknown-linux-musl"
+          cp builddir/arkana "dist/arkana-v${{ steps.version.outputs.version }}-aarch64-unknown-linux-musl"
 
       - name: Upload musl artifact
         uses: actions/upload-artifact@v4
