@@ -19,17 +19,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            g++-14 \
-            meson \
-            ninja-build \
-            cmake \
             pkg-config \
             libfontconfig-dev \
             libfreetype-dev \
@@ -39,8 +33,7 @@ jobs:
             libinput-dev \
             libxkbcommon-dev \
             libwayland-dev \
-            libasound2-dev \
-            linux-headers-generic
+            libasound2-dev
 
       - name: Install Rust
         run: |
@@ -49,23 +42,19 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Build
-        env:
-          CXX: g++-14
-        run: |
-          meson setup builddir
-          meson compile -C builddir
+        run: cargo build --release
 
       - name: Resolve app version
         id: version
         run: |
-          VERSION="$(meson introspect --projectinfo builddir | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])')"
+          VERSION="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import sys,json; print(json.load(sys.stdin)["packages"][0]["version"])')"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Package gnu artifact
         run: |
           mkdir -p dist
-          strip builddir/arkana -o "dist/arkana-v${VERSION}-aarch64-unknown-linux-gnu"
+          strip target/release/arkana -o "dist/arkana-v${VERSION}-aarch64-unknown-linux-gnu"
 
       - name: Upload gnu artifact
         uses: actions/upload-artifact@v4
@@ -79,13 +68,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Resolve app version
         id: version
         run: |
-          VERSION="$(grep -m1 "version:" meson.build | sed "s/.*version:[[:space:]]*'\\([^']*\\)'.*/\\1/")"
+          VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -99,20 +86,19 @@ jobs:
             sh -c '
               apk add --no-cache \
                 bash build-base ca-certificates curl git linux-headers \
-                pkgconf meson ninja cmake fontconfig-dev freetype-dev \
-                mesa-dev libdrm-dev eudev-dev libseat-dev libinput-dev \
-                libxkbcommon-dev wayland-dev alsa-lib-dev python3 &&
+                pkgconf fontconfig-dev freetype-dev mesa-dev libdrm-dev \
+                eudev-dev libseat-dev libinput-dev libxkbcommon-dev \
+                wayland-dev alsa-lib-dev &&
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
                 | sh -s -- -y --profile minimal &&
               export PATH="$HOME/.cargo/bin:$PATH" &&
-              meson setup builddir &&
-              meson compile -C builddir
+              cargo build --release
             '
 
       - name: Package musl artifact
         run: |
           mkdir -p dist
-          strip builddir/arkana -o "dist/arkana-v${{ steps.version.outputs.version }}-aarch64-unknown-linux-musl"
+          strip target/release/arkana -o "dist/arkana-v${{ steps.version.outputs.version }}-aarch64-unknown-linux-musl"
 
       - name: Upload musl artifact
         uses: actions/upload-artifact@v4
@@ -127,8 +113,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -136,7 +120,7 @@ jobs:
       - name: Resolve app version
         id: version
         run: |
-          VERSION="$(grep -m1 "version:" meson.build | sed "s/.*version:[[:space:]]*'\\([^']*\\)'.*/\\1/")"
+          VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 

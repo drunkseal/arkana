@@ -1,3 +1,0 @@
-[submodule "subprojects/slint-1.17.1"]
-	path = subprojects/slint-1.17.1
-	url = https://github.com/slint-ui/slint.git
