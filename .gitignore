@@ -1,6 +1,2 @@
-/builddir/
-/compile_commands.json
-/.clangd
-/subprojects/packagecache/
 /.cache/
 /target/
